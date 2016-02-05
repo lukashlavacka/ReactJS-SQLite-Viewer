@@ -154,17 +154,17 @@ var FileDropWrapper = React.createClass({
     onDragEnter : function(event) {
         event.stopPropagation();
         event.preventDefault();
-        this.props.handleStatusChange("Drop file anywhere")
+        this.props.handleStatusChange("Drop file anywhere", "none")
     },
     onDragLeave : function(event) {
         event.stopPropagation();
         event.preventDefault();
-        this.props.handleStatusChange("Drag any SQLite file")
+        this.props.handleStatusChange("Drag any SQLite file", "none")
     },
     onDragOver : function(event) {
         event.stopPropagation();
         event.preventDefault();
-        this.props.handleStatusChange("Drop file anywhere")
+        this.props.handleStatusChange("Drop file anywhere", "none")
     },
     onDrop: function(event){
         event.stopPropagation();
@@ -194,6 +194,64 @@ var Status = React.createClass({
         );
     }
 })
+
+var ChartColumns = React.createClass({
+    handleChange: function(event)
+    {
+        var xField = ReactDOM.findDOMNode(this.refs.xField).value;
+        var yField = ReactDOM.findDOMNode(this.refs.yField).value;
+        var yOperation = ReactDOM.findDOMNode(this.refs.yOperation).value;
+
+        if(xField && yField)
+            this.props.handleChartColumnsChange({xField : xField, yField: yField, yOperation: yOperation});
+    },
+    getInitialState: function() {
+        return {
+            agregateOperations: [
+                "AVG",
+                "SUM",
+                "MAX",
+                "MIN"
+            ]
+        }
+    },
+    render: function() {
+        return (
+            <BootstrapRow>
+                <form className="form-inline">
+                    <div className="form-group">
+                        <label htmlFor="xField">X field</label>
+                        <select className="form-control" id="xField" onChange={this.handleChange} ref="xField">
+                            <option value="">Select X Field</option>
+                            {this.props.columns.map(function(c){
+                                return <option key={c} value={c}>{c}</option>
+                            })}
+                        </select>
+                    </div>
+                    <div className="form-group">
+                        <label htmlFor="xField">Y field</label>
+                        <select className="form-control" id="yField" onChange={this.handleChange} ref="yField">
+                            <option value="">Select Y Field</option>
+                            {this.props.columns.map(function(c){
+                                return <option key={c} value={c}>{c}</option>
+                            })}
+                        </select>
+                    </div>
+                    <div className="form-group">
+                        <label htmlFor="yOperation">Y field Agregate Operation</label>
+                        <select className="form-control" id="yOperation" onChange={this.handleChange} ref="yOperation">
+                            <option value="">Select Y Field Agregate Operation</option>
+                            {this.state.agregateOperations.map(function(o){
+                                return <option key={o} value={o}>{o}</option>
+                            })}
+                        </select>
+                    </div>
+                </form>
+            </BootstrapRow>
+        );
+    }
+})
+
 var Interface = React.createClass({ 
     queryData: function (state) {   
         state.data = undefined;
@@ -201,9 +259,40 @@ var Interface = React.createClass({
         if(!query)
             return;
 
+        var now = new Date();
         var data = state.db.exec(query);
-
         state.data = data[0];
+        this.handleStatusChange("Last query (" + query + ") took " + (new Date() - now) + " miliseconds.", "success")
+    },
+    queryChartData: function (state) {   
+        state.chart.data = undefined;
+        var query = this.generateChartQueryFromState(state);
+        if(!query)
+            return;
+
+        var now = new Date();
+        var data = state.db.exec(query);
+        var rawData = data[0];
+        state.chart.data = this.generateChartJsData(rawData);
+        this.handleStatusChange("Last chart query (" + query + ") took " + (new Date() - now) + " miliseconds.", "success")
+    },
+    generateChartJsData: function(rawData)
+    {
+        return {
+            labels: rawData.values.map(function(v){return v[0]}),
+            datasets: [
+                {
+                    label: rawData.columns[0],
+                    fillColor: "rgba(220,220,220,0.2)",
+                    strokeColor: "rgba(220,220,220,1)",
+                    pointColor: "rgba(220,220,220,1)",
+                    pointStrokeColor: "#fff",
+                    pointHighlightFill: "#fff",
+                    pointHighlightStroke: "rgba(220,220,220,1)",
+                    data: rawData.values.map(function(v){return v[1]})             
+                }
+            ]
+        }
     },
     generateQueryFromState: function(state) {
         if(!state.table)
@@ -221,6 +310,51 @@ var Interface = React.createClass({
 
         if(state.sort && state.sort.column)
             s = s.order(state.sort.column, state.sort.descending)
+
+        return s.toString();
+    },
+    generateChartQueryFromState: function(state) {
+        if(!state.table)
+            return;
+
+        var s = squel
+            .select()
+            .field(state.chart.columns.xField);
+        
+        switch(state.chart.columns.yOperation)
+        {
+            case "AVG":
+                s = s.field("AVG(" + state.chart.columns.yField +")")
+                break;
+            case "SUM":
+                s = s.field("SUM(" + state.chart.columns.yField +")")
+                break;
+            case "MAX":
+                s = s.field("MAX(" + state.chart.columns.yField +")")
+                break;
+            case "MIN":
+                s = s.field("MIN(" + state.chart.columns.yField +")")
+                break;
+            default:
+                s = s.field(state.chart.columns.yField);
+                break;
+        }
+
+        s = s
+            .order(state.chart.columns.xField)
+            .from(state.table);
+
+        switch(state.chart.columns.yOperation)
+        {
+            case "AVG":
+            case "SUM":
+            case "MAX":
+            case "MIN":
+                s = s.group(state.chart.columns.xField)
+                break;
+            default:
+                break;
+        }
 
         return s.toString();
     },
@@ -267,15 +401,14 @@ var Interface = React.createClass({
             this.queryData(previousState);
         });
     },
-    handleFileChange: function(file)
-    {
+    handleFileChange: function(file) {
         this.handleStatusChange("Loading...");
         var now = new Date();
         var sqlReader = new FileReader();
         sqlReader.onload = function() {
             var Uints = new Uint8Array(sqlReader.result);
             var db = new SQL.Database(Uints);
-            this.handleStatusChange("Loaded in " + (new Date() - now) + " miliseconds.");
+            this.handleStatusChange("Loaded in " + (new Date() - now) + " miliseconds.", "success");
             this.setState(function(previousState) {
                 previousState.db = db;
                 previousState.tables = this.getTables(db);
@@ -284,16 +417,35 @@ var Interface = React.createClass({
         }.bind(this);
         sqlReader.readAsArrayBuffer(file);
     },
-    handleStatusChange: function(status)
-    {
+    handleStatusChange: function(status, type) {
+        switch(type)
+        {
+            case "warning":
+                toastr.warning(status)
+                break;
+            case "success":
+                toastr.success(status)
+                break;
+            case "none":
+                break;
+            case "info":
+            default:
+                toastr.info(status)
+                break;
+        }
         this.setState({ status: status });
     },
-    handleColumnChange: function(columns)
-    {
+    handleColumnChange: function(columns) {
         this.setState(function(previousState){
             previousState.selectedColumns = columns;
             this.queryData(previousState);
         });
+    },
+    handleChartColumnsChange: function(chartColumns) {
+        this.setState(function(previousState){ 
+            previousState.chart.columns = chartColumns;
+            this.queryChartData(previousState);
+        })
     },
     getInitialState: function() {
         return {
@@ -302,15 +454,15 @@ var Interface = React.createClass({
             selectedColumns: [],
             table: undefined,
             sort: {},
+            chart: {},
             status: "Drag any SQLite file"
         }
     },
-    render: function() {
-        var tableSource;    
-        var table;
+    render: function() {  
         if(this.state.tables && this.state.tables.length)
         {
-            tableSource = <TableSource tables={this.state.tables} handleTableChange={this.handleTableChange}/>;     
+            var table;
+            var tableSource = <TableSource tables={this.state.tables} handleTableChange={this.handleTableChange}/>;     
 
             if(this.state.data && this.state.data.columns && this.state.data.columns.length)        
                 table = <Table data={this.state.data} sort={this.state.sort} handleSortChange={this.handleSortChange}/>
@@ -320,10 +472,15 @@ var Interface = React.createClass({
                 table = <Status status={"No table selected"} />
         }
 
-        var displayColumn;
         if(this.state.columns)
         {
-            displayColumn = <DisplayColumn columns={this.state.columns} handleColumnChange={this.handleColumnChange} />
+           var displayColumn = <DisplayColumn columns={this.state.columns} handleColumnChange={this.handleColumnChange} />
+           var chartColumns = <ChartColumns columns={this.state.columns} handleChartColumnsChange={this.handleChartColumnsChange} />
+        }
+
+        if(this.state.chart && this.state.chart.data)
+        {
+            var chart = <LineChartComponent data={this.state.chart.data} />
         }
         
         return (
@@ -331,13 +488,32 @@ var Interface = React.createClass({
                 <Status status={this.state.status} />
                 {tableSource}
                 {displayColumn}
+                {chartColumns}
                 {table}
+                {chart}
             </FileDropWrapper>
         );
     }
 })
 
+var LineChart = Chart.React.Line;
+var LineChartComponent = React.createClass({
+    getInitialState: function()
+    {
+        return {
+            options : {
+                scaleShowGridLines : true
+            }
+        }
+    },
+    render: function() {
+        return <LineChart data={this.props.data} options={this.state.options} width="600" height="250"/>
+    }
+});
+
 ReactDOM.render(
     <Interface />,
     document.getElementById('content')
 );
+
+toastr.options.preventDuplicates = true;
