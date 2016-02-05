@@ -20,6 +20,8 @@ Select or drop SQLite file and UI should update.
 
 ## References
 
-Uses [kripken/sql.js](//github.com/kripken/sql.js) library as SQLite reader
-Uses [ziad-saab/react-checkbox-group](//github.com/ziad-saab/react-checkbox-group) for column selection
-Uses [hiddentao/squel](//github.com/hiddentao/squel) as SQL query builder
+*	Uses [kripken/sql.js](//github.com/kripken/sql.js) library as SQLite reader
+*	Uses [ziad-saab/react-checkbox-group](//github.com/ziad-saab/react-checkbox-group) for column selection
+*	Uses [hiddentao/squel](//github.com/hiddentao/squel) as SQL query builder
+*	Uses [nnnick/Chart.js](//github.com/nnnick/Chart.js) as charting library
+*	Uses [jhudson8/react-chartjs](//github.com/jhudson8/react-chartjs) as React Chart.js wrapper
