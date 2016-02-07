@@ -17,6 +17,7 @@ Select or drop SQLite file and UI should update.
 - [ ] Add agregate function support for table
 - [X] Charting support
 - [X] Add agregate function support for chart
+- [ ] Improve UI flow with chart or data selection
 
 ## References
 

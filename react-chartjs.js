@@ -195,7 +195,7 @@
 	      classData.initializeChart = function(props) {
 	        var el = ReactDOM.findDOMNode(this);
 	        var ctx = el.getContext("2d");
-	        var chart = new Chart(ctx)[chartType](this.props.data, this.props.options || {});
+	        var chart = new Chart(ctx)[chartType](props.data, props.options || {});
 	        this.state.chart = chart;
 	      };
 
