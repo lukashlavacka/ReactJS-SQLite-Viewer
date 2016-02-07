@@ -112,7 +112,7 @@ window.Interface = React.createClass({
     handleLoadDefaultFile: function(event) {
     	this.handleStatusChange("Requesting file");
     	var xhr = new XMLHttpRequest();
-		xhr.open('GET', '/test.sqlite', true);
+		xhr.open('GET', 'test.sqlite', true);
 		xhr.responseType = 'arraybuffer';
 
 		xhr.onload = function(e) {
