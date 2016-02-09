@@ -15,8 +15,10 @@ Select or drop SQLite file and UI should update.
 - [x] Implement one column sorting
 - [x] Added sample SQLite DB file
 - [ ] Add agregate function support for table
-- [X] Charting support
-- [X] Add agregate function support for chart
+- [x] Add filter support for table
+- [ ] Add filter support for chart
+- [x] Charting support
+- [x] Add agregate function support for chart
 - [ ] Improve UI flow with chart or data selection
 
 ## References

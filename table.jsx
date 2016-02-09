@@ -5,22 +5,12 @@ window.TableViewer = React.createClass({
             selectedColumns: selectedColumns
         })
     },
-    getInitialState: function() {
-        return {
-            selectedColumns: []
-        }
-    },
-    render: function() {
-        return (
-            <div>
-                <DisplayColumn db={this.props.db} table={this.props.table} handleColumnChange={this.state.handleColumnChange} handleStatusChange={this.handleStatusChange} />
-                <Table db={this.props.db} table={this.props.table} selectedColumns={this.state.selectedColumns} handleStatusChange={this.props.handleStatusChange} />
-            </div>
-        );
-    }   
-})
-
-var DisplayColumn = React.createClass({
+    handleFilterChange: function(filters)
+    {
+        this.setState({
+            filters: filters
+        })
+    },    
     getColumns: function() {
         var table = this.props.table;
         var db = this.props.db;
@@ -30,26 +20,143 @@ var DisplayColumn = React.createClass({
         var columnNames = data[0].values.map(function(t){ return t[1]});
         return columnNames;
     },
-    handleChange: function(event)
-    {
-        this.props.handleColumnChange(this.refs.selectedColumns.getCheckedValues())
-    },
-    getInitialState: function() {
-        return {
-            columns: []
-        }
-    },
     componentDidMount: function() {
         this.setState({
             columns: this.getColumns()
         })
+    },
+    getInitialState: function() {
+        return {
+            columns: [],
+            selectedColumns: [],
+            filters: [{ column: "", operation: "", value: "" }]
+        }
+    },
+    filterFilters: function(filters) {
+        return _(filters)
+            .filter(function(f){ return f.column && f.operation && (f.operation == "IS NULL" || f.operation == "IS NOT NULL" || f.value) })
+            .uniqBy(function(f){ return f.column + "_" + f.operation + "_" + f.value })
+            .value()
+    },
+    render: function() {
+        var filteredFilters = this.filterFilters(this.state.filters);
+        return (
+            <div>
+                <DisplayColumn columns={this.state.columns} handleColumnChange={this.handleColumnChange} />
+                <FilterColumn  columns={this.state.columns} filters={this.state.filters} handleFilterChange={this.handleFilterChange} />
+                <Table db={this.props.db} table={this.props.table} selectedColumns={this.state.selectedColumns} filters={filteredFilters} handleStatusChange={this.props.handleStatusChange} />
+            </div>
+        );
+    }   
+})
+
+var FilterColumn = React.createClass({
+    handleChange: function(index, type, event) {
+        var filters = this.copyFilters(this.props.filters);
+        switch(type)
+        {
+            case "column":
+            case "operation":
+            case "value":
+                filters[index][type] = event.target.value;
+                this.props.handleFilterChange(filters);
+                return;
+            case "filterAdd":
+                filters.splice(index + 1, 0, { column: "", operation: "", value: "" });
+                this.props.handleFilterChange(filters);
+                return;
+            case "filterRemove":
+                if(this.props.filters.length === 1) {
+                    filters[index] = { column: "", operation: "", value: "" };
+                }
+                else {
+                    filters.splice(index, 1);
+                }
+                this.props.handleFilterChange(filters);
+                return;
+        }
+    },
+    copyFilters: function(filters){
+        return filters.map(function(f){
+            return {
+                column: f.column,
+                operation: f.operation,
+                value: f.value
+            }
+        });
+    },
+    getInitialState: function()
+    {
+        return {
+            operations: [
+                "=",
+                "!=",
+                ">",
+                ">=",
+                "<",
+                "<=",
+                "IS NULL",
+                "IS NOT NULL",
+                "LIKE",
+            ]
+        }
+    },
+    render: function() {
+        return (
+            <BootstrapRow>
+                <form className="form-inline">
+                    {this.props.filters.map(function(filter, i){
+                        if(filter.operation !== "IS NULL" && filter.operation !== "IS NOT NULL")
+                            var valueInput =
+                                <div className="form-group">
+                                    <label className="" htmlFor={"value_" + i}>Operation</label>
+                                    <input type="text" id={"value_" + i} value={filter.value} onChange={this.handleChange.bind(this, i, "value")} />
+                                </div>
+                        return (
+                            <div key={i} className="">
+                                <div className="form-group">
+                                    <label className="" htmlFor={"column_" + i}>Column</label>
+                                    <select className="form-control input-large" id={"column_" + i} value={filter.column} onChange={this.handleChange.bind(this, i, "column")}>
+                                        <option value="">Column</option>
+                                        {this.props.columns.map(function(c){
+                                            return <option key={c} value={c}>{c}</option>
+                                        })}
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="" htmlFor={"operation_" + i}>Operation</label>
+                                    <select className="form-control input-large" id={"operation_" + i} value={filter.operation} onChange={this.handleChange.bind(this, i, "operation")}>
+                                        <option value="">Select Operation</option>
+                                        {this.state.operations.map(function(o){
+                                            return <option key={o} value={o}>{o}</option>
+                                        })}
+                                    </select>
+                                </div>
+                                {valueInput}
+                                <div className="btn-group" role="group" aria-label="Basic example">
+                                    <button type="button" className="btn btn-danger"  onClick={this.handleChange.bind(this, i, "filterRemove")}>-</button>
+                                    <button type="button" className="btn btn-success" onClick={this.handleChange.bind(this, i, "filterAdd")}>+</button>
+                                </div>
+                            </div>
+                        )
+                    }.bind(this))}
+                </form>
+            </BootstrapRow>
+        );
+    }
+})
+
+var DisplayColumn = React.createClass({
+    handleChange: function(event)
+    {
+        this.props.handleColumnChange(this.refs.selectedColumns.getCheckedValues())
     },
     render: function() {
         return (
             <BootstrapRow>
                 <form>
                     <CheckboxGroup name="columns" ref="selectedColumns" onChange={this.handleChange} >
-                        {this.state.columns.map(function(c){                                
+                        {this.props.columns.map(function(c){                                
                             return <label key={c} className="checkbox-inline"><input type="checkbox" value={c} />{c}</label>
                         }.bind(this))}
                     </CheckboxGroup>
@@ -66,12 +173,41 @@ var Table = React.createClass({
         var s = squel
             .select();
 
-        if(this.props.selectedColumns.length)
-            this.props.selectedColumns.forEach(function(c){
-                s = s.field(c);
-            });
+        this.props.selectedColumns.forEach(function(c){
+            s = s.column(c);
+        });
 
         s = s.from(this.props.table);
+
+        var filterGroups = _(this.props.filters)
+            .groupBy('column')
+            .forOwn(function(value){
+                if(!value.length)
+                    return;
+
+                var expression = squel.expr();
+                for (var i = 0; i < value.length; i++) {
+                    var f = value[i];
+                    var condition = f.column + " " + f.operation
+                    switch(f.operation)
+                    {
+                        case "=":
+                        case "!=":
+                        case ">":
+                        case ">=":
+                        case "<":
+                        case "<=":
+                            condition += " "+ f.value;
+                            break;
+                        case "LIKE":
+                            condition += " '"+ f.value + "'";
+                            break;
+                    }
+                    expression = expression.or(condition)
+                };
+
+                s = s.where(expression)
+            })
 
         if(this.state.sortColumn)
             s = s.order(this.state.sortColumn, this.state.sortDescending)
@@ -83,7 +219,7 @@ var Table = React.createClass({
         var now = new Date();
         var data = db.exec(query);
         this.props.handleStatusChange("Last table query (" + query + ") took " + (new Date() - now) + " miliseconds.", "success")
-        return data[0] && data[0] || [];
+        return data && data[0];
 
     },
     getInitialState: function() {
@@ -99,17 +235,45 @@ var Table = React.createClass({
             sortDescending: this.state.sortColumn === sortColumn ? !this.state.sortDescending : false
         })
     },
+    shouldComponentUpdate: function(nextProps, nextState) {
+        if(this.props.db === nextProps.db && this.props.table === nextProps.table)
+        {
+            if(this.props.selectedColumns.length === nextProps.selectedColumns.length)
+            {
+                for (var i = 0; i < this.props.selectedColumns.length; i++) {
+                    if(this.props.selectedColumns[i] !== nextProps.selectedColumns[i])
+                        return true;
+                };
+            }
+            if(this.props.filters.length === nextProps.filters.length)
+            {
+                for (var i = 0; i < this.props.filters.length; i++) {
+                    if(
+                            this.props.filters[i].column    !== nextProps.filters[i].column
+                        ||  this.props.filters[i].operation !== nextProps.filters[i].operation
+                        ||  this.props.filters[i].value     !== nextProps.filters[i].value)
+                    {
+                        return true;
+                    }
+                };
+                return false;
+            }
+        }
+        return true;
+    },
     render: function() {
         var data = this.getData()
+        if(data && data.columns.length)
+            var table = <div className="table-responsive">
+                        <table className="table table-striped table-hover">
+                            <Head columns={data.columns} sortColumn={this.state.sortColumn} sortDescending={this.state.sortDescending} handleSortChange={this.handleSortChange} />
+                            <Body rows={data.values} />          
+                        </table>
+                    </div>
         return (
             <BootstrapRow>
-                <p className="info">Found {data.length || 0} record(s)</p>
-                <div className="table-responsive">
-                    <table className="table table-striped table-hover">
-                        <Head columns={data.columns} sortColumn={this.state.sortColumn} sortDescending={this.state.sortDescending} handleSortChange={this.handleSortChange} />
-                        <Body rows={data.values} />          
-                    </table>
-                </div>
+                <p className="info">Found {data && data.values && data.values.length || 0} record(s)</p>
+                {table}
             </BootstrapRow>
         );
     }

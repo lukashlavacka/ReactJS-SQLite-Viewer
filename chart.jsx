@@ -77,28 +77,27 @@ var ChartColumns = React.createClass({
         var columnNames = data[0].values.map(function(t){ return t[1]});
         return columnNames;
     },
-    handleChangeXField: function(event) {
-        this.props.handleChartColumnsChange(event.target.value, this.props.series);
-    },
-    handleChangeYField: function(index, event) {
+    handleChange: function(index, type, event) {
         var series = this.copySeries(this.props.series);
-        series[index].yField = event.target.value;
-        this.props.handleChartColumnsChange(this.props.xField, series);
-    },
-    handleChangeYOperation: function(index, event) {
-        var series = this.copySeries(this.props.series);
-        series[index].yOperation = event.target.value;
-        this.props.handleChartColumnsChange(this.props.xField, series);
-    },
-    handleSeriesAdd: function(index, event) {
-        var series = this.copySeries(this.props.series);
-        series.splice(index + 1, 0, { yField: this.props.series[index].yField, yOperation: this.props.series[index].yOperation });
-        this.props.handleChartColumnsChange(this.props.xField, series);
-    },
-    handleSeriesRemove: function(index, event) {
-        var series = this.copySeries(this.props.series);
-        series.splice(index, 1);
-        this.props.handleChartColumnsChange(this.props.xField, series);
+        switch(type)
+        {
+            case "xField":
+                this.props.handleChartColumnsChange(event.target.value, this.props.series);
+                return;
+            case "yField":
+            case "yOperation":
+                series[index][type] = event.target.value;
+                this.props.handleChartColumnsChange(this.props.xField, series);
+                return;
+            case "seriesAdd":
+                series.splice(index + 1, 0, { yField: this.props.series[index].yField, yOperation: this.props.series[index].yOperation });
+                this.props.handleChartColumnsChange(this.props.xField, series);
+                return;
+            case "seriesRemove":
+                series.splice(index, 1);
+                this.props.handleChartColumnsChange(this.props.xField, series);
+                return;
+        }
     },
     componentDidMount: function() {
         this.setState({
@@ -131,19 +130,19 @@ var ChartColumns = React.createClass({
                 <form className="form-inline">
                     <div className="form-group">
                         <label className="" htmlFor="xField">X field</label>
-                        <select className="form-control input-large" id="xField" value={this.props.xField} onChange={this.handleChangeXField}>
+                        <select className="form-control input-large" id="xField" value={this.props.xField} onChange={this.handleChange.bind(this, null, "xField")}>
                             <option value="">Select X Field</option>
                             {this.state.columns.map(function(c){
                                 return <option key={c} value={c}>{c}</option>
                             })}
                         </select>
                     </div>
-                    {this.props.series.map(function(series, i){
+                    {this.props.series.map(function(serie, i){
                         return (
                             <div key={i} className="">
                                 <div className="form-group">
                                     <label className="" htmlFor={"yField_" + i}>Y field</label>
-                                    <select className="form-control input-large" id={"yField_" + i} value={this.props.series[i].yField} onChange={this.handleChangeYField.bind(this, i)}>
+                                    <select className="form-control input-large" id={"yField_" + i} value={serie.yField} onChange={this.handleChange.bind(this, i, "yField")}>
                                         <option value="">Select Y Field</option>
                                         {this.state.columns.map(function(c){
                                             return <option key={c} value={c}>{c}</option>
@@ -152,7 +151,7 @@ var ChartColumns = React.createClass({
                                 </div>                          
                                 <div className="form-group">
                                     <label className="" htmlFor={"yOperation_" + i}>Operation</label>
-                                    <select className="form-control input-large" id={"yOperation_" + i} value={this.props.series[i].yOperation} onChange={this.handleChangeYOperation.bind(this, i)}>
+                                    <select className="form-control input-large" id={"yOperation_" + i} value={serie.yOperation} onChange={this.handleChange.bind(this, i, "yOperation")}>
                                         <option value="">Select Operation</option>
                                         {this.state.agregateOperations.map(function(o){
                                             return <option key={o} value={o}>{o}</option>
@@ -160,8 +159,8 @@ var ChartColumns = React.createClass({
                                     </select>
                                 </div>
                                 <div className="btn-group" role="group" aria-label="Basic example">
-                                    <button type="button" className="btn btn-danger"  onClick={this.handleSeriesRemove.bind(this, i)} disabled={this.props.series.length < 2}>-</button>
-                                    <button type="button" className="btn btn-success" onClick={this.handleSeriesAdd.bind(this, i)}>+</button>
+                                    <button type="button" className="btn btn-danger"  onClick={this.handleChange.bind(this, i, "seriesRemove")} disabled={this.props.series.length < 2}>-</button>
+                                    <button type="button" className="btn btn-success" onClick={this.handleChange.bind(this, i, "seriesAdd")}>+</button>
                                 </div>
                             </div>
                         )
@@ -215,23 +214,19 @@ var Chart = React.createClass({
         return this.transformRawData(rawData, query);
     },
     shouldComponentUpdate: function(nextProps, nextState) {
-        if(this.state.type === nextState.type)
+        if(this.state.type === nextState.type && this.props.xField === nextProps.xField)
         {
-            if(this.props.xField === nextProps.xField)
+            if(this.props.series.length === nextProps.series.length)
             {
-                var filteredSeries = _.filter(this.props.series, function(s){ return s.yField && s.yOperation });
-                var filteredNextSeries = _.filter(nextProps.series, function(s){ return s.yField && s.yOperation });
-
-                if(filteredSeries.length === filteredNextSeries.length)
-                {
-                    for (var i = 0; i < filteredSeries.length; i++) {
-                        if(filteredSeries[i].yField !== filteredNextSeries[i].yField || filteredSeries[i].yOperation !== filteredNextSeries[i].yOperation)
-                        {
-                            return true;
-                        }
-                    };
-                    return false;
-                }
+                for (var i = 0; i < this.props.series.length; i++) {
+                    if(
+                            this.props.series[i].yField     !== nextProps.series[i].yField 
+                        ||  this.props.series[i].yOperation !== nextProps.series[i].yOperation)
+                    {
+                        return true;
+                    }
+                };
+                return false;
             }
         }
         return true;
@@ -303,11 +298,14 @@ window.ChartViewer = React.createClass({
             ]
         }
     },
-    render: function() {
-        var filteredSeries = _(this.state.series)
+    filterSeries: function(series) {
+        return _(series)
             .filter(function(s){ return s.yField && s.yOperation })
             .uniqBy(function(s){ return s.yField + "_" + s.yOperation })
             .value()
+    },
+    render: function() {
+        var filteredSeries = this.filterSeries(this.state.series);
         if(this.state.xField && filteredSeries.length)
             var chart = <Chart db={this.props.db} table={this.props.table} xField={this.state.xField} series={filteredSeries} handleStatusChange={this.props.handleStatusChange} />
         return (
